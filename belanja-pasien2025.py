@@ -163,9 +163,9 @@ def filter_data(df, start_date, end_date, selected_poli, selected_dokter, filter
     return df_filtered
 
 # Fungsi untuk membuat visualisasi (DIPERBARUI dengan visualisasi dokter)
-def create_visualizations(df, y_test=None, y_pred=None):
+def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
     """
-    Membuat visualisasi untuk dashboard
+    Membuat visualisasi untuk dashboard dengan ID unik
     """
     visualizations = {}
     
@@ -466,7 +466,7 @@ def main():
                 value=min_date,
                 min_value=min_date,
                 max_value=max_date,
-                key="start_date"
+                key="start_date_tanggal"
             )
             
             end_date = st.date_input(
@@ -474,7 +474,7 @@ def main():
                 value=max_date,
                 min_value=min_date,
                 max_value=max_date,
-                key="end_date"
+                key="end_date_tanggal"
             )
             
         elif filter_type == "bulan":
@@ -487,7 +487,8 @@ def main():
             selected_months = st.multiselect(
                 "Pilih Bulan",
                 options=month_options,
-                default=month_options[:2] if len(month_options) >= 2 else month_options
+                default=month_options[:2] if len(month_options) >= 2 else month_options,
+                key="bulan_select"
             )
             
             if selected_months:
@@ -508,7 +509,8 @@ def main():
             selected_years = st.multiselect(
                 "Pilih Tahun",
                 options=year_options,
-                default=year_options
+                default=year_options,
+                key="tahun_select"
             )
             
             if selected_years:
@@ -585,7 +587,7 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Tombol reset filter
-        if st.button("🔄 Reset Filter", type="secondary", use_container_width=True):
+        if st.button("🔄 Reset Filter", type="secondary", use_container_width=True, key="reset_button"):
             st.rerun()
     
     # Filter data berdasarkan input sidebar (DIPERBARUI)
@@ -601,47 +603,47 @@ def main():
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if filter_type == "tanggal":
-                st.metric("Periode", f"{start_date} s/d {end_date}")
+                st.metric("Periode", f"{start_date} s/d {end_date}", key="metric_periode")
             elif filter_type == "bulan":
-                st.metric("Bulan", f"{len(selected_months) if 'selected_months' in locals() else 'Semua'} bulan")
+                st.metric("Bulan", f"{len(selected_months) if 'selected_months' in locals() else 'Semua'} bulan", key="metric_bulan")
             else:
-                st.metric("Tahun", f"{len(selected_years) if 'selected_years' in locals() else 'Semua'} tahun")
+                st.metric("Tahun", f"{len(selected_years) if 'selected_years' in locals() else 'Semua'} tahun", key="metric_tahun")
         with col2:
-            st.metric("Poli", selected_poli)
+            st.metric("Poli", selected_poli, key="metric_poli")
         with col3:
-            st.metric("Dokter", selected_dokter if selected_dokter != "Semua Dokter" else "Semua")
+            st.metric("Dokter", selected_dokter if selected_dokter != "Semua Dokter" else "Semua", key="metric_dokter")
         with col4:
-            st.metric("Jumlah Data", f"{len(df_filtered):,}")
+            st.metric("Jumlah Data", f"{len(df_filtered):,}", key="metric_jumlah_data")
         
         # Metrics utama
         if len(df_filtered) > 0:
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 total_biaya = df_filtered['biaya'].sum()
-                st.metric("Total Biaya", f"Rp {total_biaya:,.0f}")
+                st.metric("Total Biaya", f"Rp {total_biaya:,.0f}", key="metric_total_biaya")
             with col2:
                 avg_biaya = df_filtered['biaya'].mean()
-                st.metric("Rata-rata Biaya", f"Rp {avg_biaya:,.0f}")
+                st.metric("Rata-rata Biaya", f"Rp {avg_biaya:,.0f}", key="metric_avg_biaya")
             with col3:
                 max_biaya = df_filtered['biaya'].max()
-                st.metric("Biaya Tertinggi", f"Rp {max_biaya:,.0f}")
+                st.metric("Biaya Tertinggi", f"Rp {max_biaya:,.0f}", key="metric_max_biaya")
             with col4:
                 min_biaya = df_filtered['biaya'].min()
-                st.metric("Biaya Terendah", f"Rp {min_biaya:,.0f}")
+                st.metric("Biaya Terendah", f"Rp {min_biaya:,.0f}", key="metric_min_biaya")
             
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 jumlah_pasien = df_filtered['id_pasien'].nunique()
-                st.metric("Pasien Unik", f"{jumlah_pasien:,}")
+                st.metric("Pasien Unik", f"{jumlah_pasien:,}", key="metric_pasien_unik")
             with col2:
                 jumlah_transaksi = len(df_filtered)
-                st.metric("Total Transaksi", f"{jumlah_transaksi:,}")
+                st.metric("Total Transaksi", f"{jumlah_transaksi:,}", key="metric_transaksi")
             with col3:
                 jumlah_poli = df_filtered['poli'].nunique()
-                st.metric("Jumlah Poli", f"{jumlah_poli}")
+                st.metric("Jumlah Poli", f"{jumlah_poli}", key="metric_jumlah_poli")
             with col4:
                 jumlah_dokter = df_filtered['dokter'].nunique()
-                st.metric("Jumlah Dokter", f"{jumlah_dokter}")
+                st.metric("Jumlah Dokter", f"{jumlah_dokter}", key="metric_jumlah_dokter")
     
     with tab2:
         st.header("📈 Visualisasi Data Biaya")
@@ -653,28 +655,28 @@ def main():
             with st.spinner("Membuat visualisasi..."):
                 visualizations = create_visualizations(df_filtered)
             
-            # Tampilkan visualisasi (DIPERBARUI dengan visualisasi dokter)
+            # Tampilkan visualisasi (DIPERBARUI dengan visualisasi dokter) dengan key unik
             col1, col2 = st.columns(2)
             
             with col1:
                 if 'distribusi_biaya' in visualizations:
-                    st.plotly_chart(visualizations['distribusi_biaya'], use_container_width=True)
+                    st.plotly_chart(visualizations['distribusi_biaya'], use_container_width=True, key="chart_distribusi_biaya")
                 
                 if 'top_poli' in visualizations:
-                    st.plotly_chart(visualizations['top_poli'], use_container_width=True)
+                    st.plotly_chart(visualizations['top_poli'], use_container_width=True, key="chart_top_poli")
                 
                 if 'top_dokter' in visualizations:
-                    st.plotly_chart(visualizations['top_dokter'], use_container_width=True)
+                    st.plotly_chart(visualizations['top_dokter'], use_container_width=True, key="chart_top_dokter")
             
             with col2:
                 if 'rata_biaya_per_poli' in visualizations:
-                    st.plotly_chart(visualizations['rata_biaya_per_poli'], use_container_width=True)
+                    st.plotly_chart(visualizations['rata_biaya_per_poli'], use_container_width=True, key="chart_rata_biaya_poli")
                 
                 if 'trend_biaya' in visualizations:
-                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True)
+                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True, key="chart_trend_biaya")
                 
                 if 'biaya_per_pasien' in visualizations:
-                    st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True)
+                    st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True, key="chart_biaya_pasien")
     
     with tab3:
         st.header("👥 Data Biaya per Pasien")
@@ -691,7 +693,7 @@ def main():
                 visualizations = create_visualizations(df_filtered)
             
             if 'biaya_per_pasien' in visualizations:
-                st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True)
+                st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True, key="chart_biaya_pasien_detail")
             
             # Tabel detail biaya per pasien
             st.subheader("📋 Detail Biaya per Pasien")
@@ -723,7 +725,8 @@ def main():
                     'Rata-rata Biaya Formatted': 'Rata-rata Biaya'
                 }),
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                key="tabel_pasien_summary"
             )
             
             # Export option
@@ -734,7 +737,8 @@ def main():
                 label="📥 Download Data Pasien (CSV)",
                 data=csv,
                 file_name="data_biaya_pasien.csv",
-                mime="text/csv"
+                mime="text/csv",
+                key="download_button_csv"
             )
     
     with tab4:
@@ -778,11 +782,11 @@ def main():
                     # Tampilkan metrik
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}")
+                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}", key="metric_mae")
                     with col2:
-                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}")
+                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}", key="metric_rmse")
                     with col3:
-                        st.metric("R² Score", f"{r2:.4f}")
+                        st.metric("R² Score", f"{r2:.4f}", key="metric_r2")
                 
                 # Visualisasi prediksi vs aktual
                 st.subheader("🎯 Visualisasi Prediksi vs Aktual")
@@ -790,7 +794,7 @@ def main():
                     pred_viz = create_visualizations(df_filtered, y_test, y_pred)
                 
                 if 'prediksi_vs_aktual' in pred_viz:
-                    st.plotly_chart(pred_viz['prediksi_vs_aktual'], use_container_width=True)
+                    st.plotly_chart(pred_viz['prediksi_vs_aktual'], use_container_width=True, key="chart_prediksi_vs_aktual")
                 
                 # Tampilkan beberapa contoh prediksi
                 st.subheader("📋 Contoh Prediksi vs Aktual")
@@ -810,7 +814,7 @@ def main():
                 contoh_df['Prediksi (Rp)'] = contoh_df['Prediksi (Rp)'].apply(lambda x: f"Rp {x:,.0f}")
                 contoh_df['Selisih (Rp)'] = contoh_df['Selisih (Rp)'].apply(lambda x: f"Rp {x:,.0f}")
                 
-                st.dataframe(contoh_df, use_container_width=True, hide_index=True)
+                st.dataframe(contoh_df, use_container_width=True, hide_index=True, key="tabel_contoh_prediksi")
                 
                 # Interpretasi R² Score
                 if r2 > 0.7:
