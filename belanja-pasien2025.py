@@ -122,7 +122,7 @@ def preprocess_data(df):
     
     return df_clean, label_encoders
 
-# Fungsi untuk filter data (DIPERBARUI dengan filter dokter)
+# Fungsi untuk filter data
 def filter_data(df, start_date, end_date, selected_poli, selected_dokter, filter_type="tanggal"):
     """
     Filter data berdasarkan tanggal/bulan/tahun, poli, dan dokter
@@ -162,10 +162,10 @@ def filter_data(df, start_date, end_date, selected_poli, selected_dokter, filter
     
     return df_filtered
 
-# Fungsi untuk membuat visualisasi (DIPERBARUI dengan visualisasi dokter)
-def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
+# Fungsi untuk membuat visualisasi
+def create_visualizations(df, y_test=None, y_pred=None):
     """
-    Membuat visualisasi untuk dashboard dengan ID unik
+    Membuat visualisasi untuk dashboard
     """
     visualizations = {}
     
@@ -216,30 +216,29 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
         )
         visualizations['top_poli'] = fig2
     
-    # 3. Top 10 Dokter berdasarkan jumlah pasien (BARU)
+    # 3. Top 10 Dokter berdasarkan jumlah pasien
     if len(df) > 0:
         top_dokter = df['dokter'].value_counts().head(10).reset_index()
         top_dokter.columns = ['Dokter', 'Jumlah Pasien']
         
-        fig3 = px.bar(top_dokter, x='Jumlah Pasien', y='Dokter', orientation='h',
-                      title='👨‍⚕️ Top 10 Dokter Berdasarkan Jumlah Pasien',
-                      color='Jumlah Pasien',
-                      color_continuous_scale='teal',
-                      text='Jumlah Pasien')
-        fig3.update_layout(
+        fig2b = px.bar(top_dokter, x='Jumlah Pasien', y='Dokter', orientation='h',
+                       title='👨‍⚕️ Top 10 Dokter Berdasarkan Jumlah Pasien',
+                       color='Jumlah Pasien',
+                       color_continuous_scale='blues',
+                       text='Jumlah Pasien')
+        fig2b.update_layout(
             template='plotly_white',
             xaxis_title="Jumlah Pasien",
             yaxis_title="",
             showlegend=False,
-            yaxis={'categoryorder': 'total ascending'},
-            height=500
+            yaxis={'categoryorder': 'total ascending'}
         )
-        fig3.update_traces(
+        fig2b.update_traces(
             texttemplate='%{text:,}',
             textposition='outside',
             hovertemplate="<b>Dokter:</b> %{y}<br><b>Jumlah Pasien:</b> %{x:,}<extra></extra>"
         )
-        visualizations['top_dokter'] = fig3
+        visualizations['top_dokter'] = fig2b
     
     # 4. Rata-rata Biaya per Poli (Top 10)
     if len(df) > 0:
@@ -256,27 +255,62 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
         # Sort by rata-rata biaya
         biaya_per_poli = biaya_per_poli.sort_values('Rata-rata Biaya', ascending=False)
         
-        fig4 = px.bar(biaya_per_poli, x='Rata-rata Biaya', y='Poli', orientation='h',
+        fig3 = px.bar(biaya_per_poli, x='Rata-rata Biaya', y='Poli', orientation='h',
                       title='💰 Rata-rata Biaya per Poli (Top 10)',
                       color='Jumlah Pasien',
                       color_continuous_scale='plasma',
                       text='Rata-rata Biaya')
-        fig4.update_layout(
+        fig3.update_layout(
             template='plotly_white',
             xaxis_title="Rata-rata Biaya (Rupiah)",
             yaxis_title="",
             xaxis=dict(tickformat=",.0f", tickprefix="Rp "),
             yaxis={'categoryorder': 'total ascending'}
         )
-        fig4.update_traces(
+        fig3.update_traces(
             texttemplate='Rp %{text:,.0f}',
             textposition='outside',
             hovertemplate="<b>Poli:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata:,}<extra></extra>",
             customdata=biaya_per_poli['Jumlah Pasien'].values
         )
-        visualizations['rata_biaya_per_poli'] = fig4
+        visualizations['rata_biaya_per_poli'] = fig3
     
-    # 5. Biaya per Pasien (Top 20)
+    # 5. Rata-rata Biaya per Dokter (Top 10)
+    if len(df) > 0:
+        # Ambil top 10 dokter berdasarkan jumlah pasien untuk visualisasi biaya
+        top_dokter_list = df['dokter'].value_counts().head(10).index.tolist()
+        df_top_dokter = df[df['dokter'].isin(top_dokter_list)]
+        
+        biaya_per_dokter = df_top_dokter.groupby('dokter').agg({
+            'biaya': 'mean',
+            'id_pasien': 'count'
+        }).reset_index()
+        biaya_per_dokter.columns = ['Dokter', 'Rata-rata Biaya', 'Jumlah Pasien']
+        
+        # Sort by rata-rata biaya
+        biaya_per_dokter = biaya_per_dokter.sort_values('Rata-rata Biaya', ascending=False)
+        
+        fig3b = px.bar(biaya_per_dokter, x='Rata-rata Biaya', y='Dokter', orientation='h',
+                       title='💰 Rata-rata Biaya per Dokter (Top 10)',
+                       color='Jumlah Pasien',
+                       color_continuous_scale='greens',
+                       text='Rata-rata Biaya')
+        fig3b.update_layout(
+            template='plotly_white',
+            xaxis_title="Rata-rata Biaya (Rupiah)",
+            yaxis_title="",
+            xaxis=dict(tickformat=",.0f", tickprefix="Rp "),
+            yaxis={'categoryorder': 'total ascending'}
+        )
+        fig3b.update_traces(
+            texttemplate='Rp %{text:,.0f}',
+            textposition='outside',
+            hovertemplate="<b>Dokter:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata:,}<extra></extra>",
+            customdata=biaya_per_dokter['Jumlah Pasien'].values
+        )
+        visualizations['rata_biaya_per_dokter'] = fig3b
+    
+    # 6. Biaya per Pasien (Top 20)
     if len(df) > 0:
         # Group by nama pasien untuk melihat total biaya per pasien
         biaya_per_pasien = df.groupby('nama_pasien').agg({
@@ -288,12 +322,12 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
         # Ambil top 20 pasien dengan total biaya tertinggi
         biaya_per_pasien = biaya_per_pasien.sort_values('Total Biaya', ascending=False).head(20)
         
-        fig5 = px.bar(biaya_per_pasien, x='Total Biaya', y='Nama Pasien', orientation='h',
+        fig4 = px.bar(biaya_per_pasien, x='Total Biaya', y='Nama Pasien', orientation='h',
                       title='👤 Biaya per Pasien (Top 20)',
                       color='Jumlah Kunjungan',
                       color_continuous_scale='sunset',
                       text='Total Biaya')
-        fig5.update_layout(
+        fig4.update_layout(
             template='plotly_white',
             xaxis_title="Total Biaya (Rupiah)",
             yaxis_title="Nama Pasien",
@@ -301,15 +335,15 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
             yaxis={'categoryorder': 'total ascending'},
             height=600
         )
-        fig5.update_traces(
+        fig4.update_traces(
             texttemplate='Rp %{text:,.0f}',
             textposition='outside',
             hovertemplate="<b>Pasien:</b> %{y}<br><b>Total Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Kunjungan:</b> %{customdata:,}<extra></extra>",
             customdata=biaya_per_pasien['Jumlah Kunjungan'].values
         )
-        visualizations['biaya_per_pasien'] = fig5
+        visualizations['biaya_per_pasien'] = fig4
     
-    # 6. Trend Biaya berdasarkan Periode
+    # 7. Trend Biaya berdasarkan Periode
     if len(df) > 0:
         # Agregasi biaya berdasarkan bulan
         biaya_periode = df.groupby('bulan_tahun').agg({
@@ -328,10 +362,10 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
             biaya_periode['Jumlah Pasien'].values
         ])
         
-        fig6 = go.Figure()
+        fig5 = go.Figure()
         
         # Total biaya
-        fig6.add_trace(go.Bar(
+        fig5.add_trace(go.Bar(
             x=biaya_periode['Periode_Str'],
             y=biaya_periode['Total Biaya'],
             name='Total Biaya',
@@ -343,7 +377,7 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
         ))
         
         # Rata-rata biaya (line)
-        fig6.add_trace(go.Scatter(
+        fig5.add_trace(go.Scatter(
             x=biaya_periode['Periode_Str'],
             y=biaya_periode['Rata-rata Biaya'],
             name='Rata-rata Biaya',
@@ -354,7 +388,7 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
             hovertemplate="<b>Periode:</b> %{x}<br><b>Rata-rata Biaya:</b> Rp %{y:,.0f}<extra></extra>"
         ))
         
-        fig6.update_layout(
+        fig5.update_layout(
             title='📈 Trend Biaya Berdasarkan Periode',
             xaxis_title='Periode',
             yaxis_title='Total Biaya (Rupiah)',
@@ -373,11 +407,11 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
                 tickprefix="Rp "
             )
         )
-        visualizations['trend_biaya'] = fig6
+        visualizations['trend_biaya'] = fig5
     
-    # 7. Scatter plot prediksi vs aktual (jika ada)
+    # 8. Scatter plot prediksi vs aktual (jika ada)
     if y_pred is not None and y_test is not None and len(y_test) > 0:
-        fig7 = go.Figure()
+        fig6 = go.Figure()
         
         # Batasi jumlah data untuk performa
         max_points = min(1000, len(y_test))
@@ -389,7 +423,7 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
         # Gabungkan data untuk hover
         custom_data = np.column_stack([selisih])
         
-        fig7.add_trace(go.Scatter(
+        fig6.add_trace(go.Scatter(
             x=y_test_sample, 
             y=y_pred_sample,
             mode='markers', 
@@ -403,7 +437,7 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
         min_val = min(y_test_sample.min(), y_pred_sample.min())
         max_val = max(y_test_sample.max(), y_pred_sample.max())
         
-        fig7.add_trace(go.Scatter(
+        fig6.add_trace(go.Scatter(
             x=[min_val, max_val],
             y=[min_val, max_val],
             mode='lines', 
@@ -412,7 +446,7 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
             hovertemplate=None
         ))
         
-        fig7.update_layout(
+        fig6.update_layout(
             title='🎯 Prediksi vs Aktual',
             xaxis_title='Biaya Aktual (Rupiah)',
             yaxis_title='Biaya Prediksi (Rupiah)',
@@ -420,7 +454,7 @@ def create_visualizations(df, y_test=None, y_pred=None, viz_id=""):
             xaxis=dict(tickformat=",.0f", tickprefix="Rp "),
             yaxis=dict(tickformat=",.0f", tickprefix="Rp ")
         )
-        visualizations['prediksi_vs_aktual'] = fig7
+        visualizations['prediksi_vs_aktual'] = fig6
     
     return visualizations
 
@@ -438,7 +472,7 @@ def main():
     with st.spinner("Memproses data..."):
         df_processed, label_encoders = preprocess_data(df_raw)
     
-    # Sidebar - Filter (DIPERBARUI dengan filter dokter)
+    # Sidebar - Filter
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/000000/hospital.png", width=100)
         st.title("🔍 Filter Data")
@@ -466,7 +500,7 @@ def main():
                 value=min_date,
                 min_value=min_date,
                 max_value=max_date,
-                key="start_date_tanggal"
+                key="start_date"
             )
             
             end_date = st.date_input(
@@ -474,7 +508,7 @@ def main():
                 value=max_date,
                 min_value=min_date,
                 max_value=max_date,
-                key="end_date_tanggal"
+                key="end_date"
             )
             
         elif filter_type == "bulan":
@@ -487,8 +521,7 @@ def main():
             selected_months = st.multiselect(
                 "Pilih Bulan",
                 options=month_options,
-                default=month_options[:2] if len(month_options) >= 2 else month_options,
-                key="bulan_select"
+                default=month_options[:2] if len(month_options) >= 2 else month_options
             )
             
             if selected_months:
@@ -509,8 +542,7 @@ def main():
             selected_years = st.multiselect(
                 "Pilih Tahun",
                 options=year_options,
-                default=year_options,
-                key="tahun_select"
+                default=year_options
             )
             
             if selected_years:
@@ -540,7 +572,6 @@ def main():
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Filter Dokter (BARU)
         st.markdown('<div class="filter-section">', unsafe_allow_html=True)
         st.subheader("👨‍⚕️ Filter Dokter")
         
@@ -554,7 +585,7 @@ def main():
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Statistik filter (DIPERBARUI)
+        # Statistik filter
         st.markdown('<div class="filter-section">', unsafe_allow_html=True)
         st.subheader("📊 Statistik Filter")
         
@@ -571,26 +602,23 @@ def main():
             st.write(f"**Total Biaya:** Rp {total_biaya:,.0f}")
             
             # Tampilkan info filter yang aktif
-            if selected_poli != "Semua Poli":
-                st.write(f"**Poli:** {selected_poli}")
-            if selected_dokter != "Semua Dokter":
-                st.write(f"**Dokter:** {selected_dokter}")
-            
-            # Tampilkan info periode yang dipilih
             if filter_type == "tanggal":
                 st.write(f"**Periode:** {start_date} s/d {end_date}")
             elif filter_type == "bulan":
                 st.write(f"**Bulan:** {selected_months if 'selected_months' in locals() else 'Semua'}")
             else:
                 st.write(f"**Tahun:** {selected_years if 'selected_years' in locals() else 'Semua'}")
+            
+            st.write(f"**Poli:** {selected_poli}")
+            st.write(f"**Dokter:** {selected_dokter}")
         
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Tombol reset filter
-        if st.button("🔄 Reset Filter", type="secondary", use_container_width=True, key="reset_button"):
+        if st.button("🔄 Reset Filter", type="secondary", use_container_width=True):
             st.rerun()
     
-    # Filter data berdasarkan input sidebar (DIPERBARUI)
+    # Filter data berdasarkan input sidebar
     df_filtered = filter_data(df_processed, start_date, end_date, selected_poli, selected_dokter, filter_type)
     
     # Tab navigasi
@@ -599,51 +627,51 @@ def main():
     with tab1:
         st.header("📊 Dashboard Utama")
         
-        # Info filter aktif (DIPERBARUI dengan dokter)
+        # Info filter aktif
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if filter_type == "tanggal":
-                st.metric("Periode", f"{start_date} s/d {end_date}", key="metric_periode")
+                st.metric("Periode", f"{start_date} to {end_date}")
             elif filter_type == "bulan":
-                st.metric("Bulan", f"{len(selected_months) if 'selected_months' in locals() else 'Semua'} bulan", key="metric_bulan")
+                st.metric("Bulan", f"{len(selected_months) if 'selected_months' in locals() else 'Semua'} bulan")
             else:
-                st.metric("Tahun", f"{len(selected_years) if 'selected_years' in locals() else 'Semua'} tahun", key="metric_tahun")
+                st.metric("Tahun", f"{len(selected_years) if 'selected_years' in locals() else 'Semua'} tahun")
         with col2:
-            st.metric("Poli", selected_poli, key="metric_poli")
+            st.metric("Poli", selected_poli)
         with col3:
-            st.metric("Dokter", selected_dokter if selected_dokter != "Semua Dokter" else "Semua", key="metric_dokter")
+            st.metric("Dokter", selected_dokter)
         with col4:
-            st.metric("Jumlah Data", f"{len(df_filtered):,}", key="metric_jumlah_data")
+            st.metric("Jumlah Data", f"{len(df_filtered):,}")
         
         # Metrics utama
         if len(df_filtered) > 0:
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 total_biaya = df_filtered['biaya'].sum()
-                st.metric("Total Biaya", f"Rp {total_biaya:,.0f}", key="metric_total_biaya")
+                st.metric("Total Biaya", f"Rp {total_biaya:,.0f}")
             with col2:
                 avg_biaya = df_filtered['biaya'].mean()
-                st.metric("Rata-rata Biaya", f"Rp {avg_biaya:,.0f}", key="metric_avg_biaya")
+                st.metric("Rata-rata Biaya", f"Rp {avg_biaya:,.0f}")
             with col3:
                 max_biaya = df_filtered['biaya'].max()
-                st.metric("Biaya Tertinggi", f"Rp {max_biaya:,.0f}", key="metric_max_biaya")
+                st.metric("Biaya Tertinggi", f"Rp {max_biaya:,.0f}")
             with col4:
                 min_biaya = df_filtered['biaya'].min()
-                st.metric("Biaya Terendah", f"Rp {min_biaya:,.0f}", key="metric_min_biaya")
+                st.metric("Biaya Terendah", f"Rp {min_biaya:,.0f}")
             
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 jumlah_pasien = df_filtered['id_pasien'].nunique()
-                st.metric("Pasien Unik", f"{jumlah_pasien:,}", key="metric_pasien_unik")
+                st.metric("Pasien Unik", f"{jumlah_pasien:,}")
             with col2:
                 jumlah_transaksi = len(df_filtered)
-                st.metric("Total Transaksi", f"{jumlah_transaksi:,}", key="metric_transaksi")
+                st.metric("Total Transaksi", f"{jumlah_transaksi:,}")
             with col3:
                 jumlah_poli = df_filtered['poli'].nunique()
-                st.metric("Jumlah Poli", f"{jumlah_poli}", key="metric_jumlah_poli")
+                st.metric("Jumlah Poli", f"{jumlah_poli}")
             with col4:
                 jumlah_dokter = df_filtered['dokter'].nunique()
-                st.metric("Jumlah Dokter", f"{jumlah_dokter}", key="metric_jumlah_dokter")
+                st.metric("Jumlah Dokter", f"{jumlah_dokter}")
     
     with tab2:
         st.header("📈 Visualisasi Data Biaya")
@@ -655,28 +683,28 @@ def main():
             with st.spinner("Membuat visualisasi..."):
                 visualizations = create_visualizations(df_filtered)
             
-            # Tampilkan visualisasi (DIPERBARUI dengan visualisasi dokter) dengan key unik
+            # Tampilkan visualisasi dalam 2 kolom
             col1, col2 = st.columns(2)
             
             with col1:
                 if 'distribusi_biaya' in visualizations:
-                    st.plotly_chart(visualizations['distribusi_biaya'], use_container_width=True, key="chart_distribusi_biaya")
+                    st.plotly_chart(visualizations['distribusi_biaya'], use_container_width=True)
                 
                 if 'top_poli' in visualizations:
-                    st.plotly_chart(visualizations['top_poli'], use_container_width=True, key="chart_top_poli")
+                    st.plotly_chart(visualizations['top_poli'], use_container_width=True)
                 
-                if 'top_dokter' in visualizations:
-                    st.plotly_chart(visualizations['top_dokter'], use_container_width=True, key="chart_top_dokter")
+                if 'rata_biaya_per_poli' in visualizations:
+                    st.plotly_chart(visualizations['rata_biaya_per_poli'], use_container_width=True)
             
             with col2:
-                if 'rata_biaya_per_poli' in visualizations:
-                    st.plotly_chart(visualizations['rata_biaya_per_poli'], use_container_width=True, key="chart_rata_biaya_poli")
+                if 'top_dokter' in visualizations:
+                    st.plotly_chart(visualizations['top_dokter'], use_container_width=True)
+                
+                if 'rata_biaya_per_dokter' in visualizations:
+                    st.plotly_chart(visualizations['rata_biaya_per_dokter'], use_container_width=True)
                 
                 if 'trend_biaya' in visualizations:
-                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True, key="chart_trend_biaya")
-                
-                if 'biaya_per_pasien' in visualizations:
-                    st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True, key="chart_biaya_pasien")
+                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True)
     
     with tab3:
         st.header("👥 Data Biaya per Pasien")
@@ -684,16 +712,12 @@ def main():
         if len(df_filtered) == 0:
             st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter saat ini")
         else:
-            # Tampilkan informasi filter yang aktif (BARU)
-            if selected_dokter != "Semua Dokter":
-                st.info(f"**Menampilkan data untuk dokter:** {selected_dokter}")
-            
             # Tampilkan visualisasi biaya per pasien
             with st.spinner("Membuat visualisasi biaya per pasien..."):
                 visualizations = create_visualizations(df_filtered)
             
             if 'biaya_per_pasien' in visualizations:
-                st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True, key="chart_biaya_pasien_detail")
+                st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True)
             
             # Tabel detail biaya per pasien
             st.subheader("📋 Detail Biaya per Pasien")
@@ -725,8 +749,7 @@ def main():
                     'Rata-rata Biaya Formatted': 'Rata-rata Biaya'
                 }),
                 use_container_width=True,
-                hide_index=True,
-                key="tabel_pasien_summary"
+                hide_index=True
             )
             
             # Export option
@@ -737,8 +760,7 @@ def main():
                 label="📥 Download Data Pasien (CSV)",
                 data=csv,
                 file_name="data_biaya_pasien.csv",
-                mime="text/csv",
-                key="download_button_csv"
+                mime="text/csv"
             )
     
     with tab4:
@@ -782,11 +804,11 @@ def main():
                     # Tampilkan metrik
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}", key="metric_mae")
+                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}")
                     with col2:
-                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}", key="metric_rmse")
+                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}")
                     with col3:
-                        st.metric("R² Score", f"{r2:.4f}", key="metric_r2")
+                        st.metric("R² Score", f"{r2:.4f}")
                 
                 # Visualisasi prediksi vs aktual
                 st.subheader("🎯 Visualisasi Prediksi vs Aktual")
@@ -794,7 +816,7 @@ def main():
                     pred_viz = create_visualizations(df_filtered, y_test, y_pred)
                 
                 if 'prediksi_vs_aktual' in pred_viz:
-                    st.plotly_chart(pred_viz['prediksi_vs_aktual'], use_container_width=True, key="chart_prediksi_vs_aktual")
+                    st.plotly_chart(pred_viz['prediksi_vs_aktual'], use_container_width=True)
                 
                 # Tampilkan beberapa contoh prediksi
                 st.subheader("📋 Contoh Prediksi vs Aktual")
@@ -814,7 +836,7 @@ def main():
                 contoh_df['Prediksi (Rp)'] = contoh_df['Prediksi (Rp)'].apply(lambda x: f"Rp {x:,.0f}")
                 contoh_df['Selisih (Rp)'] = contoh_df['Selisih (Rp)'].apply(lambda x: f"Rp {x:,.0f}")
                 
-                st.dataframe(contoh_df, use_container_width=True, hide_index=True, key="tabel_contoh_prediksi")
+                st.dataframe(contoh_df, use_container_width=True, hide_index=True)
                 
                 # Interpretasi R² Score
                 if r2 > 0.7:
