@@ -61,24 +61,58 @@ def load_data_from_github():
     """
     Load data dari URL GitHub
     """
-    github_raw_url = 'https://raw.githubusercontent.com/wawanab705-design/belanja/refs/heads/main/belanja-jan-nov2025.csv'
+    # URL untuk dataset pertama (default)
+    github_raw_url_1 = 'https://raw.githubusercontent.com/wawanab705-design/belanja/refs/heads/main/belanja-jan-nov2025.csv'
+    
+    # URL untuk dataset baru dengan jenis jaminan
+    github_raw_url_2 = 'https://raw.githubusercontent.com/wawanab705-design/belanja/refs/heads/main/belanja-pasien-asuransi2025.csv'
     
     try:
-        # Untuk file CSV dengan pemisah ,
-        df = pd.read_csv(github_raw_url, sep=',', header=None, low_memory=False, encoding='utf-8')
-
-        if df.shape[1] == 12:
-            df.columns = [
+        # Load dataset pertama
+        df1 = pd.read_csv(github_raw_url_1, sep=',', header=None, low_memory=False, encoding='utf-8')
+        
+        # Load dataset kedua dengan jenis jaminan
+        df2 = pd.read_csv(github_raw_url_2, sep=';', encoding='utf-8')
+        
+        # Proses dataset pertama
+        if df1.shape[1] == 12:
+            df1.columns = [
                 'id_transaksi', 'id_pasien', 'no_urut', 'nama_pasien', 'waktu',
                 'dokter', 'jenis_layanan', 'poli', 'sumber_pembayaran', 'biaya',
                 'diskon', 'flag'
             ]
-            return df, "✅ Data berhasil dimuat dari GitHub!"
         else:
-            return None, f"❌ Jumlah kolom tidak sesuai. Ditemukan {df.shape[1]} kolom."
-
+            return None, None, f"❌ Dataset 1: Jumlah kolom tidak sesuai. Ditemukan {df1.shape[1]} kolom."
+        
+        # Proses dataset kedua - mapping kolom ke format yang sama
+        # Mapping kolom dataset kedua ke format yang konsisten
+        column_mapping = {
+            'NO': 'id_transaksi',
+            'RM': 'id_pasien',
+            'EPS': 'no_urut',
+            'NAMA': 'nama_pasien',
+            'ADMISI': 'waktu',
+            'DOKTER': 'dokter',
+            'JENIS PELAYANAN': 'poli',
+            'RAWAT': 'jenis_layanan',
+            'PENJAMIN': 'jenis_jaminan',  # Kolom baru untuk jenis jaminan
+            'TOTAL': 'biaya',
+            'DISKON': 'diskon',
+            'MENINGGAL': 'flag'
+        }
+        
+        df2 = df2.rename(columns=column_mapping)
+        
+        # Tambahkan kolom sumber_pembayaran yang kosong untuk dataset kedua
+        df2['sumber_pembayaran'] = df2['jenis_jaminan']
+        
+        # Gabungkan kedua dataset
+        df_combined = pd.concat([df1, df2], ignore_index=True)
+        
+        return df_combined, df2, "✅ Data berhasil dimuat dari GitHub (2 dataset digabungkan)!"
+        
     except Exception as e:
-        return None, f"❌ Error membaca file: {str(e)}"
+        return None, None, f"❌ Error membaca file: {str(e)}"
 
 # Fungsi preprocessing
 def preprocess_data(df):
@@ -88,8 +122,11 @@ def preprocess_data(df):
     # Buat salinan dataframe
     df_clean = df.copy()
     
-    # Drop baris pertama (header deskriptif)
-    df_clean = df_clean.iloc[1:].copy()
+    # Drop baris pertama (header deskriptif) jika ada
+    if 'id_transaksi' in df_clean.columns:
+        # Cek apakah baris pertama adalah header deskriptif
+        if df_clean['id_transaksi'].iloc[0] == 'id_transaksi':
+            df_clean = df_clean.iloc[1:].copy()
     
     # Konversi waktu
     df_clean['waktu'] = pd.to_datetime(df_clean['waktu'], format='%d/%m/%Y %H:%M', errors='coerce')
@@ -111,6 +148,10 @@ def preprocess_data(df):
     df_clean['bulan_tahun'] = df_clean['waktu'].dt.to_period('M').astype(str)
     df_clean['minggu'] = df_clean['waktu'].dt.isocalendar().week
     
+    # Tambahkan kolom jenis_jaminan jika tidak ada (untuk dataset pertama)
+    if 'jenis_jaminan' not in df_clean.columns:
+        df_clean['jenis_jaminan'] = df_clean.get('sumber_pembayaran', 'Tidak Diketahui')
+    
     # Encode fitur kategorikal untuk modeling
     label_encoders = {}
     kategori_cols = ['dokter', 'poli', 'jenis_layanan']
@@ -123,9 +164,9 @@ def preprocess_data(df):
     return df_clean, label_encoders
 
 # Fungsi untuk filter data
-def filter_data(df, start_date, end_date, selected_poli, selected_dokter, filter_type="tanggal"):
+def filter_data(df, start_date, end_date, selected_poli, selected_dokter, selected_jaminan, filter_type="tanggal"):
     """
-    Filter data berdasarkan tanggal/bulan/tahun, poli, dan dokter
+    Filter data berdasarkan tanggal/bulan/tahun, poli, dokter, dan jenis jaminan
     """
     df_filtered = df.copy()
     
@@ -160,12 +201,16 @@ def filter_data(df, start_date, end_date, selected_poli, selected_dokter, filter
     if selected_dokter and selected_dokter != "Semua Dokter":
         df_filtered = df_filtered[df_filtered['dokter'] == selected_dokter]
     
+    # Filter berdasarkan jenis jaminan
+    if selected_jaminan and selected_jaminan != "Semua Jaminan":
+        df_filtered = df_filtered[df_filtered['jenis_jaminan'] == selected_jaminan]
+    
     return df_filtered
 
-# Fungsi untuk membuat visualisasi
+# Fungsi untuk membuat visualisasi (tambahan visualisasi untuk jenis jaminan)
 def create_visualizations(df, y_test=None, y_pred=None):
     """
-    Membuat visualisasi untuk dashboard
+    Membuat visualisasi untuk dashboard (dengan tambahan visualisasi jenis jaminan)
     """
     visualizations = {}
     
@@ -240,7 +285,32 @@ def create_visualizations(df, y_test=None, y_pred=None):
         )
         visualizations['top_dokter'] = fig2b
     
-    # 4. Rata-rata Biaya per Poli (Top 10)
+    # 4. Distribusi Jenis Jaminan (Visualisasi Baru)
+    if len(df) > 0 and 'jenis_jaminan' in df.columns:
+        # Ambil top 10 jenis jaminan
+        top_jaminan = df['jenis_jaminan'].value_counts().head(10).reset_index()
+        top_jaminan.columns = ['Jenis Jaminan', 'Jumlah Pasien']
+        
+        fig2c = px.bar(top_jaminan, x='Jumlah Pasien', y='Jenis Jaminan', orientation='h',
+                       title='🏥 Top 10 Jenis Jaminan',
+                       color='Jumlah Pasien',
+                       color_continuous_scale='greens',
+                       text='Jumlah Pasien')
+        fig2c.update_layout(
+            template='plotly_white',
+            xaxis_title="Jumlah Pasien",
+            yaxis_title="Jenis Jaminan",
+            showlegend=False,
+            yaxis={'categoryorder': 'total ascending'}
+        )
+        fig2c.update_traces(
+            texttemplate='%{text:,}',
+            textposition='outside',
+            hovertemplate="<b>Jenis Jaminan:</b> %{y}<br><b>Jumlah Pasien:</b> %{x:,}<extra></extra>"
+        )
+        visualizations['top_jaminan'] = fig2c
+    
+    # 5. Rata-rata Biaya per Poli (Top 10)
     if len(df) > 0:
         # Ambil top 10 poli berdasarkan jumlah pasien untuk visualisasi biaya
         top_poli_list = df['poli'].value_counts().head(10).index.tolist()
@@ -270,12 +340,12 @@ def create_visualizations(df, y_test=None, y_pred=None):
         fig3.update_traces(
             texttemplate='Rp %{text:,.0f}',
             textposition='outside',
-            hovertemplate="<b>Poli:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata:,}<extra></extra>",
-            customdata=biaya_per_poli['Jumlah Pasien'].values
+            hovertemplate="<b>Poli:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata[0]:,}<extra></extra>",
+            customdata=np.column_stack([biaya_per_poli['Jumlah Pasien'].values])
         )
         visualizations['rata_biaya_per_poli'] = fig3
     
-    # 5. Rata-rata Biaya per Dokter (Top 10)
+    # 6. Rata-rata Biaya per Dokter (Top 10)
     if len(df) > 0:
         # Ambil top 10 dokter berdasarkan jumlah pasien untuk visualisasi biaya
         top_dokter_list = df['dokter'].value_counts().head(10).index.tolist()
@@ -305,12 +375,46 @@ def create_visualizations(df, y_test=None, y_pred=None):
         fig3b.update_traces(
             texttemplate='Rp %{text:,.0f}',
             textposition='outside',
-            hovertemplate="<b>Dokter:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata:,}<extra></extra>",
-            customdata=biaya_per_dokter['Jumlah Pasien'].values
+            hovertemplate="<b>Dokter:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata[0]:,}<extra></extra>",
+            customdata=np.column_stack([biaya_per_dokter['Jumlah Pasien'].values])
         )
         visualizations['rata_biaya_per_dokter'] = fig3b
     
-    # 6. Biaya per Pasien (Top 20)
+    # 7. Rata-rata Biaya per Jenis Jaminan (Visualisasi Baru)
+    if len(df) > 0 and 'jenis_jaminan' in df.columns:
+        # Ambil top 10 jenis jaminan berdasarkan jumlah pasien
+        top_jaminan_list = df['jenis_jaminan'].value_counts().head(10).index.tolist()
+        df_top_jaminan = df[df['jenis_jaminan'].isin(top_jaminan_list)]
+        
+        biaya_per_jaminan = df_top_jaminan.groupby('jenis_jaminan').agg({
+            'biaya': ['mean', 'sum', 'count']
+        }).reset_index()
+        biaya_per_jaminan.columns = ['Jenis Jaminan', 'Rata-rata Biaya', 'Total Biaya', 'Jumlah Pasien']
+        
+        # Sort by rata-rata biaya
+        biaya_per_jaminan = biaya_per_jaminan.sort_values('Rata-rata Biaya', ascending=False)
+        
+        fig3c = px.bar(biaya_per_jaminan, x='Rata-rata Biaya', y='Jenis Jaminan', orientation='h',
+                       title='💰 Rata-rata Biaya per Jenis Jaminan (Top 10)',
+                       color='Jumlah Pasien',
+                       color_continuous_scale='oranges',
+                       text='Rata-rata Biaya')
+        fig3c.update_layout(
+            template='plotly_white',
+            xaxis_title="Rata-rata Biaya (Rupiah)",
+            yaxis_title="Jenis Jaminan",
+            xaxis=dict(tickformat=",.0f", tickprefix="Rp "),
+            yaxis={'categoryorder': 'total ascending'}
+        )
+        fig3c.update_traces(
+            texttemplate='Rp %{text:,.0f}',
+            textposition='outside',
+            hovertemplate="<b>Jenis Jaminan:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata[0]:,}<extra></extra>",
+            customdata=np.column_stack([biaya_per_jaminan['Jumlah Pasien'].values])
+        )
+        visualizations['rata_biaya_per_jaminan'] = fig3c
+    
+    # 8. Biaya per Pasien (Top 20)
     if len(df) > 0:
         # Group by nama pasien untuk melihat total biaya per pasien
         biaya_per_pasien = df.groupby('nama_pasien').agg({
@@ -338,12 +442,12 @@ def create_visualizations(df, y_test=None, y_pred=None):
         fig4.update_traces(
             texttemplate='Rp %{text:,.0f}',
             textposition='outside',
-            hovertemplate="<b>Pasien:</b> %{y}<br><b>Total Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Kunjungan:</b> %{customdata:,}<extra></extra>",
-            customdata=biaya_per_pasien['Jumlah Kunjungan'].values
+            hovertemplate="<b>Pasien:</b> %{y}<br><b>Total Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Kunjungan:</b> %{customdata[0]:,}<extra></extra>",
+            customdata=np.column_stack([biaya_per_pasien['Jumlah Kunjungan'].values])
         )
         visualizations['biaya_per_pasien'] = fig4
     
-    # 7. Trend Biaya berdasarkan Periode
+    # 9. Trend Biaya berdasarkan Periode
     if len(df) > 0:
         # Agregasi biaya berdasarkan bulan
         biaya_periode = df.groupby('bulan_tahun').agg({
@@ -409,7 +513,41 @@ def create_visualizations(df, y_test=None, y_pred=None):
         )
         visualizations['trend_biaya'] = fig5
     
-    # 8. Scatter plot prediksi vs aktual (jika ada)
+    # 10. Pie Chart Distribusi Jenis Jaminan (Visualisasi Baru)
+    if len(df) > 0 and 'jenis_jaminan' in df.columns:
+        # Hitung distribusi jenis jaminan
+        jaminan_dist = df['jenis_jaminan'].value_counts().head(8).reset_index()
+        jaminan_dist.columns = ['Jenis Jaminan', 'Jumlah']
+        
+        # Hitung "Lainnya" untuk sisa jaminan
+        if len(df['jenis_jaminan'].value_counts()) > 8:
+            total_lainnya = df['jenis_jaminan'].value_counts().iloc[8:].sum()
+            lainnya_row = pd.DataFrame({'Jenis Jaminan': ['Lainnya'], 'Jumlah': [total_lainnya]})
+            jaminan_dist = pd.concat([jaminan_dist, lainnya_row], ignore_index=True)
+        
+        fig5b = px.pie(jaminan_dist, values='Jumlah', names='Jenis Jaminan',
+                       title='📊 Distribusi Jenis Jaminan',
+                       color_discrete_sequence=px.colors.qualitative.Set3,
+                       hole=0.4)
+        fig5b.update_traces(
+            textposition='inside',
+            textinfo='percent+label',
+            hovertemplate="<b>%{label}</b><br>Jumlah: %{value:,}<br>Persentase: %{percent}<extra></extra>"
+        )
+        fig5b.update_layout(
+            template='plotly_white',
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
+        )
+        visualizations['distribusi_jaminan_pie'] = fig5b
+    
+    # 11. Scatter plot prediksi vs aktual (jika ada)
     if y_pred is not None and y_test is not None and len(y_test) > 0:
         fig6 = go.Figure()
         
@@ -462,7 +600,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
 def main():
     # Load data pertama kali
     with st.spinner("Memuat data dari GitHub..."):
-        df_raw, message = load_data_from_github()
+        df_raw, df_jaminan, message = load_data_from_github()
     
     if df_raw is None:
         st.error(message)
@@ -585,12 +723,29 @@ def main():
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
+        st.markdown('<div class="filter-section">', unsafe_allow_html=True)
+        st.subheader("🏢 Filter Jenis Jaminan")
+        
+        # Dapatkan daftar jenis jaminan unik
+        if 'jenis_jaminan' in df_processed.columns:
+            jaminan_options = ["Semua Jaminan"] + sorted(df_processed['jenis_jaminan'].dropna().unique().tolist())
+            selected_jaminan = st.selectbox(
+                "Pilih Jenis Jaminan",
+                options=jaminan_options,
+                index=0,
+                key="jaminan_select"
+            )
+        else:
+            st.info("Data jenis jaminan tidak tersedia")
+            selected_jaminan = "Semua Jaminan"
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         # Statistik filter
         st.markdown('<div class="filter-section">', unsafe_allow_html=True)
         st.subheader("📊 Statistik Filter")
         
         # Filter data untuk statistik
-        df_temp_filtered = filter_data(df_processed, start_date, end_date, selected_poli, selected_dokter, filter_type)
+        df_temp_filtered = filter_data(df_processed, start_date, end_date, selected_poli, selected_dokter, selected_jaminan, filter_type)
         
         st.write(f"**Data Awal:** {len(df_processed):,} baris")
         st.write(f"**Data Filtered:** {len(df_temp_filtered):,} baris")
@@ -611,6 +766,8 @@ def main():
             
             st.write(f"**Poli:** {selected_poli}")
             st.write(f"**Dokter:** {selected_dokter}")
+            if 'jenis_jaminan' in df_processed.columns:
+                st.write(f"**Jenis Jaminan:** {selected_jaminan}")
         
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -619,16 +776,16 @@ def main():
             st.rerun()
     
     # Filter data berdasarkan input sidebar
-    df_filtered = filter_data(df_processed, start_date, end_date, selected_poli, selected_dokter, filter_type)
+    df_filtered = filter_data(df_processed, start_date, end_date, selected_poli, selected_dokter, selected_jaminan, filter_type)
     
     # Tab navigasi
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "📈 Visualisasi Biaya", "👥 Data Pasien", "🤖 Prediksi"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Dashboard", "📈 Visualisasi Biaya", "👥 Data Pasien", "🏢 Jenis Jaminan", "🤖 Prediksi"])
     
     with tab1:
         st.header("📊 Dashboard Utama")
         
         # Info filter aktif
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             if filter_type == "tanggal":
                 st.metric("Periode", f"{start_date} to {end_date}")
@@ -641,6 +798,11 @@ def main():
         with col3:
             st.metric("Dokter", selected_dokter)
         with col4:
+            if 'jenis_jaminan' in df_processed.columns:
+                st.metric("Jenis Jaminan", selected_jaminan)
+            else:
+                st.metric("Jaminan", "Tidak Tersedia")
+        with col5:
             st.metric("Jumlah Data", f"{len(df_filtered):,}")
         
         # Metrics utama
@@ -672,6 +834,18 @@ def main():
             with col4:
                 jumlah_dokter = df_filtered['dokter'].nunique()
                 st.metric("Jumlah Dokter", f"{jumlah_dokter}")
+            
+            # Metrics untuk jenis jaminan jika tersedia
+            if 'jenis_jaminan' in df_filtered.columns:
+                col1, col2 = st.columns(2)
+                with col1:
+                    jumlah_jaminan = df_filtered['jenis_jaminan'].nunique()
+                    st.metric("Jenis Jaminan Unik", f"{jumlah_jaminan}")
+                with col2:
+                    # Jaminan dengan jumlah pasien terbanyak
+                    if not df_filtered.empty:
+                        top_jaminan = df_filtered['jenis_jaminan'].value_counts().index[0]
+                        st.metric("Jaminan Terbanyak", top_jaminan[:20] + "..." if len(top_jaminan) > 20 else top_jaminan)
     
     with tab2:
         st.header("📈 Visualisasi Data Biaya")
@@ -695,6 +869,9 @@ def main():
                 
                 if 'rata_biaya_per_poli' in visualizations:
                     st.plotly_chart(visualizations['rata_biaya_per_poli'], use_container_width=True)
+                
+                if 'trend_biaya' in visualizations:
+                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True)
             
             with col2:
                 if 'top_dokter' in visualizations:
@@ -703,8 +880,12 @@ def main():
                 if 'rata_biaya_per_dokter' in visualizations:
                     st.plotly_chart(visualizations['rata_biaya_per_dokter'], use_container_width=True)
                 
-                if 'trend_biaya' in visualizations:
-                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True)
+                # Tampilkan visualisasi terkait jaminan jika ada
+                if 'top_jaminan' in visualizations:
+                    st.plotly_chart(visualizations['top_jaminan'], use_container_width=True)
+                
+                if 'distribusi_jaminan_pie' in visualizations:
+                    st.plotly_chart(visualizations['distribusi_jaminan_pie'], use_container_width=True)
     
     with tab3:
         st.header("👥 Data Biaya per Pasien")
@@ -726,11 +907,12 @@ def main():
             pasien_summary = df_filtered.groupby(['nama_pasien', 'id_pasien']).agg({
                 'biaya': ['sum', 'mean', 'count'],
                 'poli': lambda x: ', '.join(x.unique()[:3]),
-                'dokter': lambda x: ', '.join(x.unique()[:2])
+                'dokter': lambda x: ', '.join(x.unique()[:2]),
+                'jenis_jaminan': lambda x: x.mode()[0] if not x.empty else 'Tidak Diketahui'
             }).reset_index()
             
             pasien_summary.columns = ['Nama Pasien', 'ID Pasien', 'Total Biaya', 'Rata-rata Biaya', 
-                                     'Jumlah Kunjungan', 'Poli', 'Dokter']
+                                     'Jumlah Kunjungan', 'Poli', 'Dokter', 'Jenis Jaminan Utama']
             
             # Sort by total biaya
             pasien_summary = pasien_summary.sort_values('Total Biaya', ascending=False)
@@ -741,7 +923,7 @@ def main():
             
             # Tampilkan tabel
             display_cols = ['Nama Pasien', 'Jumlah Kunjungan', 'Total Biaya Formatted', 
-                          'Rata-rata Biaya Formatted', 'Poli', 'Dokter']
+                          'Rata-rata Biaya Formatted', 'Poli', 'Dokter', 'Jenis Jaminan Utama']
             
             st.dataframe(
                 pasien_summary[display_cols].rename(columns={
@@ -754,7 +936,7 @@ def main():
             
             # Export option
             csv = pasien_summary[['Nama Pasien', 'ID Pasien', 'Jumlah Kunjungan', 
-                                 'Total Biaya', 'Rata-rata Biaya', 'Poli', 'Dokter']].to_csv(index=False)
+                                 'Total Biaya', 'Rata-rata Biaya', 'Poli', 'Dokter', 'Jenis Jaminan Utama']].to_csv(index=False)
             
             st.download_button(
                 label="📥 Download Data Pasien (CSV)",
@@ -764,6 +946,84 @@ def main():
             )
     
     with tab4:
+        st.header("🏢 Analisis Jenis Jaminan")
+        
+        if len(df_filtered) == 0:
+            st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter saat ini")
+        elif 'jenis_jaminan' not in df_filtered.columns:
+            st.warning("⚠️ Data jenis jaminan tidak tersedia dalam dataset")
+        else:
+            # Buat visualisasi khusus jaminan
+            with st.spinner("Membuat analisis jenis jaminan..."):
+                visualizations = create_visualizations(df_filtered)
+            
+            # Tampilkan semua visualisasi terkait jaminan
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if 'top_jaminan' in visualizations:
+                    st.plotly_chart(visualizations['top_jaminan'], use_container_width=True)
+                
+                if 'distribusi_jaminan_pie' in visualizations:
+                    st.plotly_chart(visualizations['distribusi_jaminan_pie'], use_container_width=True)
+            
+            with col2:
+                if 'rata_biaya_per_jaminan' in visualizations:
+                    st.plotly_chart(visualizations['rata_biaya_per_jaminan'], use_container_width=True)
+            
+            # Analisis detail per jenis jaminan
+            st.subheader("📊 Analisis Detail per Jenis Jaminan")
+            
+            # Group by jenis jaminan
+            jaminan_summary = df_filtered.groupby('jenis_jaminan').agg({
+                'biaya': ['sum', 'mean', 'min', 'max', 'count'],
+                'id_pasien': 'nunique',
+                'poli': lambda x: ', '.join(x.value_counts().head(3).index.tolist()),
+                'dokter': lambda x: ', '.join(x.value_counts().head(3).index.tolist())
+            }).reset_index()
+            
+            jaminan_summary.columns = ['Jenis Jaminan', 'Total Biaya', 'Rata-rata Biaya', 
+                                      'Biaya Min', 'Biaya Max', 'Jumlah Transaksi', 
+                                      'Jumlah Pasien Unik', 'Top 3 Poli', 'Top 3 Dokter']
+            
+            # Sort by total biaya
+            jaminan_summary = jaminan_summary.sort_values('Total Biaya', ascending=False)
+            
+            # Format nilai Rupiah
+            jaminan_summary['Total Biaya Formatted'] = jaminan_summary['Total Biaya'].apply(lambda x: f"Rp {x:,.0f}")
+            jaminan_summary['Rata-rata Biaya Formatted'] = jaminan_summary['Rata-rata Biaya'].apply(lambda x: f"Rp {x:,.0f}")
+            jaminan_summary['Biaya Min Formatted'] = jaminan_summary['Biaya Min'].apply(lambda x: f"Rp {x:,.0f}")
+            jaminan_summary['Biaya Max Formatted'] = jaminan_summary['Biaya Max'].apply(lambda x: f"Rp {x:,.0f}")
+            
+            # Tampilkan tabel
+            display_cols = ['Jenis Jaminan', 'Jumlah Transaksi', 'Jumlah Pasien Unik',
+                          'Total Biaya Formatted', 'Rata-rata Biaya Formatted',
+                          'Biaya Min Formatted', 'Biaya Max Formatted', 'Top 3 Poli', 'Top 3 Dokter']
+            
+            st.dataframe(
+                jaminan_summary[display_cols].rename(columns={
+                    'Total Biaya Formatted': 'Total Biaya',
+                    'Rata-rata Biaya Formatted': 'Rata-rata Biaya',
+                    'Biaya Min Formatted': 'Biaya Min',
+                    'Biaya Max Formatted': 'Biaya Max'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Export option untuk data jaminan
+            csv_jaminan = jaminan_summary[['Jenis Jaminan', 'Jumlah Transaksi', 'Jumlah Pasien Unik',
+                                         'Total Biaya', 'Rata-rata Biaya', 'Biaya Min', 'Biaya Max',
+                                         'Top 3 Poli', 'Top 3 Dokter']].to_csv(index=False)
+            
+            st.download_button(
+                label="📥 Download Data Jaminan (CSV)",
+                data=csv_jaminan,
+                file_name="data_analisis_jaminan.csv",
+                mime="text/csv"
+            )
+    
+    with tab5:
         st.header("🤖 Prediksi Biaya")
         
         if len(df_filtered) < 100:
@@ -858,8 +1118,8 @@ def main():
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666;">
-    <p>Analisis Biaya Pelayanan Pasien 2025</p>
-    <p>Data Source: dataset | Update Terakhir: November 2025</p>
+    <p>Analisis Biaya Pelayanan Pasien 2025 - Dengan Data Jenis Jaminan</p>
+    <p>Data Source: 2 Dataset dari GitHub | Update Terakhir: November 2025</p>
 </div>
 """, unsafe_allow_html=True)
 
