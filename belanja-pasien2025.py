@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore")
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+import hashlib
 
 # Konfigurasi halaman
 st.set_page_config(
@@ -55,6 +56,11 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Fungsi untuk membuat ID unik berdasarkan konten
+def create_unique_id(text):
+    """Buat ID unik berdasarkan string"""
+    return hashlib.md5(text.encode()).hexdigest()[:8]
+
 # Fungsi untuk load data dari GitHub
 @st.cache_data
 def load_data_from_github():
@@ -85,7 +91,6 @@ def load_data_from_github():
             return None, None, f"❌ Dataset 1: Jumlah kolom tidak sesuai. Ditemukan {df1.shape[1]} kolom."
         
         # Proses dataset kedua - mapping kolom ke format yang sama
-        # Mapping kolom dataset kedua ke format yang konsisten
         column_mapping = {
             'NO': 'id_transaksi',
             'RM': 'id_pasien',
@@ -125,7 +130,7 @@ def preprocess_data(df):
     # Drop baris pertama (header deskriptif) jika ada
     if 'id_transaksi' in df_clean.columns:
         # Cek apakah baris pertama adalah header deskriptif
-        if df_clean['id_transaksi'].iloc[0] == 'id_transaksi':
+        if not df_clean.empty and str(df_clean['id_transaksi'].iloc[0]) == 'id_transaksi':
             df_clean = df_clean.iloc[1:].copy()
     
     # Konversi waktu
@@ -207,12 +212,16 @@ def filter_data(df, start_date, end_date, selected_poli, selected_dokter, select
     
     return df_filtered
 
-# Fungsi untuk membuat visualisasi (tambahan visualisasi untuk jenis jaminan)
-def create_visualizations(df, y_test=None, y_pred=None):
+# Fungsi untuk membuat visualisasi dengan ID unik
+def create_visualizations(df, tab_name="", y_test=None, y_pred=None):
     """
-    Membuat visualisasi untuk dashboard (dengan tambahan visualisasi jenis jaminan)
+    Membuat visualisasi untuk dashboard dengan ID unik berdasarkan tab_name
     """
     visualizations = {}
+    
+    # Buat suffix unik berdasarkan tab_name
+    suffix = f"_{tab_name}" if tab_name else ""
+    suffix = suffix.replace(" ", "_").lower()
     
     # 1. Distribusi Biaya Pelayanan
     if len(df) > 0:
@@ -235,7 +244,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
         fig1.update_traces(
             hovertemplate="<b>Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{y}<extra></extra>"
         )
-        visualizations['distribusi_biaya'] = fig1
+        visualizations[f'distribusi_biaya{suffix}'] = fig1
     
     # 2. Top 10 Poli berdasarkan jumlah pasien
     if len(df) > 0:
@@ -259,7 +268,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             textposition='outside',
             hovertemplate="<b>Poli:</b> %{y}<br><b>Jumlah Pasien:</b> %{x:,}<extra></extra>"
         )
-        visualizations['top_poli'] = fig2
+        visualizations[f'top_poli{suffix}'] = fig2
     
     # 3. Top 10 Dokter berdasarkan jumlah pasien
     if len(df) > 0:
@@ -283,7 +292,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             textposition='outside',
             hovertemplate="<b>Dokter:</b> %{y}<br><b>Jumlah Pasien:</b> %{x:,}<extra></extra>"
         )
-        visualizations['top_dokter'] = fig2b
+        visualizations[f'top_dokter{suffix}'] = fig2b
     
     # 4. Distribusi Jenis Jaminan (Visualisasi Baru)
     if len(df) > 0 and 'jenis_jaminan' in df.columns:
@@ -308,7 +317,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             textposition='outside',
             hovertemplate="<b>Jenis Jaminan:</b> %{y}<br><b>Jumlah Pasien:</b> %{x:,}<extra></extra>"
         )
-        visualizations['top_jaminan'] = fig2c
+        visualizations[f'top_jaminan{suffix}'] = fig2c
     
     # 5. Rata-rata Biaya per Poli (Top 10)
     if len(df) > 0:
@@ -343,7 +352,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             hovertemplate="<b>Poli:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata[0]:,}<extra></extra>",
             customdata=np.column_stack([biaya_per_poli['Jumlah Pasien'].values])
         )
-        visualizations['rata_biaya_per_poli'] = fig3
+        visualizations[f'rata_biaya_per_poli{suffix}'] = fig3
     
     # 6. Rata-rata Biaya per Dokter (Top 10)
     if len(df) > 0:
@@ -378,7 +387,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             hovertemplate="<b>Dokter:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata[0]:,}<extra></extra>",
             customdata=np.column_stack([biaya_per_dokter['Jumlah Pasien'].values])
         )
-        visualizations['rata_biaya_per_dokter'] = fig3b
+        visualizations[f'rata_biaya_per_dokter{suffix}'] = fig3b
     
     # 7. Rata-rata Biaya per Jenis Jaminan (Visualisasi Baru)
     if len(df) > 0 and 'jenis_jaminan' in df.columns:
@@ -412,7 +421,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             hovertemplate="<b>Jenis Jaminan:</b> %{y}<br><b>Rata-rata Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Pasien:</b> %{customdata[0]:,}<extra></extra>",
             customdata=np.column_stack([biaya_per_jaminan['Jumlah Pasien'].values])
         )
-        visualizations['rata_biaya_per_jaminan'] = fig3c
+        visualizations[f'rata_biaya_per_jaminan{suffix}'] = fig3c
     
     # 8. Biaya per Pasien (Top 20)
     if len(df) > 0:
@@ -445,7 +454,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             hovertemplate="<b>Pasien:</b> %{y}<br><b>Total Biaya:</b> Rp %{x:,.0f}<br><b>Jumlah Kunjungan:</b> %{customdata[0]:,}<extra></extra>",
             customdata=np.column_stack([biaya_per_pasien['Jumlah Kunjungan'].values])
         )
-        visualizations['biaya_per_pasien'] = fig4
+        visualizations[f'biaya_per_pasien{suffix}'] = fig4
     
     # 9. Trend Biaya berdasarkan Periode
     if len(df) > 0:
@@ -511,7 +520,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
                 tickprefix="Rp "
             )
         )
-        visualizations['trend_biaya'] = fig5
+        visualizations[f'trend_biaya{suffix}'] = fig5
     
     # 10. Pie Chart Distribusi Jenis Jaminan (Visualisasi Baru)
     if len(df) > 0 and 'jenis_jaminan' in df.columns:
@@ -545,7 +554,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
                 x=1
             )
         )
-        visualizations['distribusi_jaminan_pie'] = fig5b
+        visualizations[f'distribusi_jaminan_pie{suffix}'] = fig5b
     
     # 11. Scatter plot prediksi vs aktual (jika ada)
     if y_pred is not None and y_test is not None and len(y_test) > 0:
@@ -592,7 +601,7 @@ def create_visualizations(df, y_test=None, y_pred=None):
             xaxis=dict(tickformat=",.0f", tickprefix="Rp "),
             yaxis=dict(tickformat=",.0f", tickprefix="Rp ")
         )
-        visualizations['prediksi_vs_aktual'] = fig6
+        visualizations[f'prediksi_vs_aktual{suffix}'] = fig6
     
     return visualizations
 
@@ -659,7 +668,8 @@ def main():
             selected_months = st.multiselect(
                 "Pilih Bulan",
                 options=month_options,
-                default=month_options[:2] if len(month_options) >= 2 else month_options
+                default=month_options[:2] if len(month_options) >= 2 else month_options,
+                key="selected_months"
             )
             
             if selected_months:
@@ -680,7 +690,8 @@ def main():
             selected_years = st.multiselect(
                 "Pilih Tahun",
                 options=year_options,
-                default=year_options
+                default=year_options,
+                key="selected_years"
             )
             
             if selected_years:
@@ -853,39 +864,39 @@ def main():
         if len(df_filtered) == 0:
             st.warning("⚠️ Tidak ada data untuk divisualisasikan dengan filter saat ini")
         else:
-            # Buat visualisasi
+            # Buat visualisasi dengan suffix unik untuk tab2
             with st.spinner("Membuat visualisasi..."):
-                visualizations = create_visualizations(df_filtered)
+                visualizations_tab2 = create_visualizations(df_filtered, "tab2")
             
             # Tampilkan visualisasi dalam 2 kolom
             col1, col2 = st.columns(2)
             
             with col1:
-                if 'distribusi_biaya' in visualizations:
-                    st.plotly_chart(visualizations['distribusi_biaya'], use_container_width=True)
+                if f'distribusi_biaya_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'distribusi_biaya_tab2'], use_container_width=True, key="distribusi_biaya_tab2")
                 
-                if 'top_poli' in visualizations:
-                    st.plotly_chart(visualizations['top_poli'], use_container_width=True)
+                if f'top_poli_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'top_poli_tab2'], use_container_width=True, key="top_poli_tab2")
                 
-                if 'rata_biaya_per_poli' in visualizations:
-                    st.plotly_chart(visualizations['rata_biaya_per_poli'], use_container_width=True)
+                if f'rata_biaya_per_poli_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'rata_biaya_per_poli_tab2'], use_container_width=True, key="rata_biaya_per_poli_tab2")
                 
-                if 'trend_biaya' in visualizations:
-                    st.plotly_chart(visualizations['trend_biaya'], use_container_width=True)
+                if f'trend_biaya_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'trend_biaya_tab2'], use_container_width=True, key="trend_biaya_tab2")
             
             with col2:
-                if 'top_dokter' in visualizations:
-                    st.plotly_chart(visualizations['top_dokter'], use_container_width=True)
+                if f'top_dokter_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'top_dokter_tab2'], use_container_width=True, key="top_dokter_tab2")
                 
-                if 'rata_biaya_per_dokter' in visualizations:
-                    st.plotly_chart(visualizations['rata_biaya_per_dokter'], use_container_width=True)
+                if f'rata_biaya_per_dokter_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'rata_biaya_per_dokter_tab2'], use_container_width=True, key="rata_biaya_per_dokter_tab2")
                 
                 # Tampilkan visualisasi terkait jaminan jika ada
-                if 'top_jaminan' in visualizations:
-                    st.plotly_chart(visualizations['top_jaminan'], use_container_width=True)
+                if f'top_jaminan_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'top_jaminan_tab2'], use_container_width=True, key="top_jaminan_tab2")
                 
-                if 'distribusi_jaminan_pie' in visualizations:
-                    st.plotly_chart(visualizations['distribusi_jaminan_pie'], use_container_width=True)
+                if f'distribusi_jaminan_pie_tab2' in visualizations_tab2:
+                    st.plotly_chart(visualizations_tab2[f'distribusi_jaminan_pie_tab2'], use_container_width=True, key="distribusi_jaminan_pie_tab2")
     
     with tab3:
         st.header("👥 Data Biaya per Pasien")
@@ -893,12 +904,12 @@ def main():
         if len(df_filtered) == 0:
             st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter saat ini")
         else:
-            # Tampilkan visualisasi biaya per pasien
+            # Buat visualisasi dengan suffix unik untuk tab3
             with st.spinner("Membuat visualisasi biaya per pasien..."):
-                visualizations = create_visualizations(df_filtered)
+                visualizations_tab3 = create_visualizations(df_filtered, "tab3")
             
-            if 'biaya_per_pasien' in visualizations:
-                st.plotly_chart(visualizations['biaya_per_pasien'], use_container_width=True)
+            if f'biaya_per_pasien_tab3' in visualizations_tab3:
+                st.plotly_chart(visualizations_tab3[f'biaya_per_pasien_tab3'], use_container_width=True, key="biaya_per_pasien_tab3")
             
             # Tabel detail biaya per pasien
             st.subheader("📋 Detail Biaya per Pasien")
@@ -908,7 +919,7 @@ def main():
                 'biaya': ['sum', 'mean', 'count'],
                 'poli': lambda x: ', '.join(x.unique()[:3]),
                 'dokter': lambda x: ', '.join(x.unique()[:2]),
-                'jenis_jaminan': lambda x: x.mode()[0] if not x.empty else 'Tidak Diketahui'
+                'jenis_jaminan': lambda x: x.mode()[0] if not x.empty and len(x.mode()) > 0 else 'Tidak Diketahui'
             }).reset_index()
             
             pasien_summary.columns = ['Nama Pasien', 'ID Pasien', 'Total Biaya', 'Rata-rata Biaya', 
@@ -931,7 +942,8 @@ def main():
                     'Rata-rata Biaya Formatted': 'Rata-rata Biaya'
                 }),
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                key="dataframe_pasien_tab3"
             )
             
             # Export option
@@ -942,7 +954,8 @@ def main():
                 label="📥 Download Data Pasien (CSV)",
                 data=csv,
                 file_name="data_biaya_pasien.csv",
-                mime="text/csv"
+                mime="text/csv",
+                key="download_pasien_tab3"
             )
     
     with tab4:
@@ -953,23 +966,23 @@ def main():
         elif 'jenis_jaminan' not in df_filtered.columns:
             st.warning("⚠️ Data jenis jaminan tidak tersedia dalam dataset")
         else:
-            # Buat visualisasi khusus jaminan
+            # Buat visualisasi khusus jaminan dengan suffix unik
             with st.spinner("Membuat analisis jenis jaminan..."):
-                visualizations = create_visualizations(df_filtered)
+                visualizations_tab4 = create_visualizations(df_filtered, "tab4")
             
             # Tampilkan semua visualisasi terkait jaminan
             col1, col2 = st.columns(2)
             
             with col1:
-                if 'top_jaminan' in visualizations:
-                    st.plotly_chart(visualizations['top_jaminan'], use_container_width=True)
+                if f'top_jaminan_tab4' in visualizations_tab4:
+                    st.plotly_chart(visualizations_tab4[f'top_jaminan_tab4'], use_container_width=True, key="top_jaminan_tab4")
                 
-                if 'distribusi_jaminan_pie' in visualizations:
-                    st.plotly_chart(visualizations['distribusi_jaminan_pie'], use_container_width=True)
+                if f'distribusi_jaminan_pie_tab4' in visualizations_tab4:
+                    st.plotly_chart(visualizations_tab4[f'distribusi_jaminan_pie_tab4'], use_container_width=True, key="distribusi_jaminan_pie_tab4")
             
             with col2:
-                if 'rata_biaya_per_jaminan' in visualizations:
-                    st.plotly_chart(visualizations['rata_biaya_per_jaminan'], use_container_width=True)
+                if f'rata_biaya_per_jaminan_tab4' in visualizations_tab4:
+                    st.plotly_chart(visualizations_tab4[f'rata_biaya_per_jaminan_tab4'], use_container_width=True, key="rata_biaya_per_jaminan_tab4")
             
             # Analisis detail per jenis jaminan
             st.subheader("📊 Analisis Detail per Jenis Jaminan")
@@ -1008,7 +1021,8 @@ def main():
                     'Biaya Max Formatted': 'Biaya Max'
                 }),
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                key="dataframe_jaminan_tab4"
             )
             
             # Export option untuk data jaminan
@@ -1020,7 +1034,8 @@ def main():
                 label="📥 Download Data Jaminan (CSV)",
                 data=csv_jaminan,
                 file_name="data_analisis_jaminan.csv",
-                mime="text/csv"
+                mime="text/csv",
+                key="download_jaminan_tab4"
             )
     
     with tab5:
@@ -1064,19 +1079,19 @@ def main():
                     # Tampilkan metrik
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}")
+                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}", key="mae_metric")
                     with col2:
-                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}")
+                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}", key="rmse_metric")
                     with col3:
-                        st.metric("R² Score", f"{r2:.4f}")
+                        st.metric("R² Score", f"{r2:.4f}", key="r2_metric")
                 
-                # Visualisasi prediksi vs aktual
+                # Visualisasi prediksi vs aktual dengan suffix unik
                 st.subheader("🎯 Visualisasi Prediksi vs Aktual")
                 with st.spinner("Membuat visualisasi prediksi..."):
-                    pred_viz = create_visualizations(df_filtered, y_test, y_pred)
+                    pred_viz = create_visualizations(df_filtered, "tab5", y_test, y_pred)
                 
-                if 'prediksi_vs_aktual' in pred_viz:
-                    st.plotly_chart(pred_viz['prediksi_vs_aktual'], use_container_width=True)
+                if f'prediksi_vs_aktual_tab5' in pred_viz:
+                    st.plotly_chart(pred_viz[f'prediksi_vs_aktual_tab5'], use_container_width=True, key="prediksi_vs_aktual_tab5")
                 
                 # Tampilkan beberapa contoh prediksi
                 st.subheader("📋 Contoh Prediksi vs Aktual")
@@ -1096,7 +1111,7 @@ def main():
                 contoh_df['Prediksi (Rp)'] = contoh_df['Prediksi (Rp)'].apply(lambda x: f"Rp {x:,.0f}")
                 contoh_df['Selisih (Rp)'] = contoh_df['Selisih (Rp)'].apply(lambda x: f"Rp {x:,.0f}")
                 
-                st.dataframe(contoh_df, use_container_width=True, hide_index=True)
+                st.dataframe(contoh_df, use_container_width=True, hide_index=True, key="dataframe_prediksi_tab5")
                 
                 # Interpretasi R² Score
                 if r2 > 0.7:
