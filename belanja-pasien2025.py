@@ -56,11 +56,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Fungsi untuk membuat ID unik berdasarkan konten
-def create_unique_id(text):
-    """Buat ID unik berdasarkan string"""
-    return hashlib.md5(text.encode()).hexdigest()[:8]
-
 # Fungsi untuk load data dari GitHub
 @st.cache_data
 def load_data_from_github():
@@ -1076,14 +1071,14 @@ def main():
                     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
                     r2 = r2_score(y_test, y_pred)
                     
-                    # Tampilkan metrik
+                    # Tampilkan metrik (TANPA parameter key)
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}", key="mae_metric")
+                        st.metric("MAE (Mean Absolute Error)", f"Rp {mae:,.0f}")
                     with col2:
-                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}", key="rmse_metric")
+                        st.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.0f}")
                     with col3:
-                        st.metric("R² Score", f"{r2:.4f}", key="r2_metric")
+                        st.metric("R² Score", f"{r2:.4f}")
                 
                 # Visualisasi prediksi vs aktual dengan suffix unik
                 st.subheader("🎯 Visualisasi Prediksi vs Aktual")
