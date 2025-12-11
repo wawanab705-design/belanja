@@ -27,7 +27,7 @@ st.markdown("""
         color: #1E3A8A;
         text-align: center;
         padding: 1rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #eae266 0%, #4ba285 100%);
         border-radius: 10px;
         margin-bottom: 2rem;
     }
@@ -1135,4 +1135,5 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
