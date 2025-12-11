@@ -56,7 +56,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Fungsi untuk load data dari GitHub
+# Fungsi untuk load data
 @st.cache_data
 def load_data_from_github():
     """
@@ -109,7 +109,7 @@ def load_data_from_github():
         # Gabungkan kedua dataset
         df_combined = pd.concat([df1, df2], ignore_index=True)
         
-        return df_combined, df2, "✅ Data berhasil dimuat dari GitHub (2 dataset digabungkan)!"
+        return df_combined, df2, "✅ Data berhasil dimuat (2 dataset digabungkan)!"
         
     except Exception as e:
         return None, None, f"❌ Error membaca file: {str(e)}"
@@ -1129,9 +1129,10 @@ st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666;">
     <p>Analisis Biaya Pelayanan Pasien 2025 - Dengan Data Jenis Jaminan</p>
-    <p>Data Source: 2 Dataset dari GitHub | Update Terakhir: November 2025</p>
+    <p>Data Source: gabungan Dataset | Update Terakhir: November 2025</p>
 </div>
 """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
